@@ -498,7 +498,7 @@ Tests: 20 passed
 | 问题池 | workspace_id | 通过后状态 |
 |---|---|---|
 | 交付池 | 65152329 | 已关闭 |
-| 产研池 | 44949107 | 线上验证 |
+| 产研池 | 44949107 | 按影响环境判定：基线环境/测试环境=已关闭；正式/灰度/群/远航=线上验证 |
 | 售后池 | 41700174 | 线上验证 |
 
 评论内容要求：
@@ -526,13 +526,32 @@ python3 "$TAPD_SCRIPT" bug-update \
   --status "已关闭" \
   --current-user CURRENT_USER
 
-# 当产研池或售后池验证通过后，更新 bug 为"线上验证"
+# 当产研池验证通过且影响环境命中“基线环境/测试环境”时，更新为"已关闭"
+python3 "$TAPD_SCRIPT" bug-update \
+   --workspace-id 44949107 \
+   --id 1119626 \
+   --status "已关闭" \
+   --current-user CURRENT_USER
+
+# 当产研池验证通过且影响环境命中“正式/灰度/群/远航”时，更新为"线上验证"
 python3 "$TAPD_SCRIPT" bug-update \
   --workspace-id 44949107 \
   --id 1119626 \
   --status "线上验证" \
   --current-user CURRENT_USER
+
+# 当售后池验证通过后，更新 bug 为"线上验证"
+python3 "$TAPD_SCRIPT" bug-update \
+   --workspace-id 41700174 \
+   --id 1119626 \
+   --status "线上验证" \
+   --current-user CURRENT_USER
 ```
+
+产研池“影响环境”判定补充：
+- 若 API 返回为空，必须二次读取问题单（不带 fields 再查一次，必要时从 TAPD 网页字段确认）。
+- 只要命中“基线环境”，直接按“已关闭”处理。
+- 二次读取后仍无法判定时，按“线上验证”处理，并在评论中注明“影响环境未明确，按线上验证流程处理”。
 
 若验证失败或阻塞：
 - 不执行“已关闭/线上验证”状态更新
