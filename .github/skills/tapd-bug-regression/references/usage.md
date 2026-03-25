@@ -47,7 +47,7 @@ python3 --version  # 需要 >= 3.6
 
 直接在对话中输入，支持以下形式：
 
-**形式 1：仅输入 bug ID（默认交付池）**
+**形式 1：仅输入 bug ID（自动轮询三个池子）**
 ```
 /tapd-bug-regression 1119626
 ```
@@ -107,8 +107,9 @@ python3 --version  # 需要 >= 3.6
      - "产研池" / "产研" → 44949107
      - "售后池" / "售后" → 41700174
 
-3. **默认交付池**（若无其他线索）
-   - workspace_id = 65152329
+3. **自动轮询三个池子**（若无其他线索）
+   - 按 65152329 → 44949107 → 41700174 顺序调用 `bug-get`
+   - 第一个命中的池子作为后续回归目标
 
 **示例**：
 ```
@@ -238,16 +239,91 @@ npm run dev:delivery
 
 回写评论时，必须按以下顺序执行：
 
-1. 使用 TAPD 网页评论编辑器，直接复制粘贴图片到评论区。
-2. 若粘贴失败，改为附件区上传图片，并在评论中逐条引用。
-3. 仅在前两种都不可用时，才使用 API 写纯文本评论。
+1. 使用 TAPD API（`comment-add` / `comment-update`）直接写评论正文。
+2. 将已上传附件转换为可点击的 TAPD 预览链接，并写入评论正文。
+3. 若 API 回写失败或需要额外补充，再使用网页登录后的网页评论编辑器修正。
+4. 仅在 API 和网页登录回写都不可用时，才使用手工协同方式处理。
 
-注意：API 评论不等于图片已贴入评论区。若使用 API，评论内必须明确标注“图片见网页评论区”或“图片见附件”。
+注意：
+- API 评论优先使用 HTML 分段结构，必须保留换行与空行，避免评论挤成一段。
+- 若图片无法直接内嵌，必须提供 TAPD 附件预览链接，点击链接应能直接打开图片。
+- 推荐链接格式：`https://www.tapd.cn/<workspace_id>/attachments/preview_attachments/<attachment_id>/bug?`
+- 网页登录写评论现在是第二优先级，不再作为默认首选链路。
 
 评论可读性要求：
 - 必须使用分段结构（回归信息 / 验证结果 / 证据截图）。
 - 每个“实际验证通过截图X”后必须单独换行写“实际截图结果：...”。
+- 每个截图块后必须再单独一行写“查看截图X：<链接>”。
 - 不允许将全部验证结果与证据写成连续段落。
+
+推荐 API 评论片段：
+
+```html
+<p>【回归结论】验证通过。</p>
+<p>【验证结果】</p>
+<p>1）问答知识页导出按钮状态已核对。</p>
+<p>2）文件知识页问答.txt 可见。</p>
+<p>3）文件预览页无 00401 报错。</p>
+<p>【截图证据】</p>
+<p>实际验证通过截图1：问答知识页（导出列表按钮状态）<br/>实际截图结果：0 条数据，按钮置灰。<br/>查看截图1：<a href="https://www.tapd.cn/65152329/attachments/preview_attachments/1165152329001015133/bug?" target="_blank">打开图片</a></p>
+```
+
+#### 2.8 固定回写策略（推荐直接照做）
+
+后续 TAPD 回归默认使用下面这条固定链路：
+
+1. 完成验证后，先把截图保存到本地证据目录。
+2. 通过 TAPD 附件区上传截图。
+3. 记录每张图对应的 `attachment_id`。
+4. 拼接每张图的 TAPD 预览链接。
+5. 用 API 一次性写入评论正文。
+6. 若 API 评论失败，再改用网页登录评论作为第二优先级。
+
+固定链路示意：
+
+```text
+本地截图
+→ 上传 TAPD 附件
+→ 生成 preview_attachments 链接
+→ 组织 HTML 评论正文
+→ 调用 comment-add / comment-update
+→ 成功后结束
+```
+
+附件链接拼接规则：
+
+```text
+https://www.tapd.cn/<workspace_id>/attachments/preview_attachments/<attachment_id>/bug?
+```
+
+示例：
+
+```text
+https://www.tapd.cn/65152329/attachments/preview_attachments/1165152329001015133/bug?
+```
+
+固定评论骨架（唯一版本）：
+
+```html
+<p>【回归结论】验证通过。</p>
+<p>【回归时间】2026-03-25</p>
+<p>【回归环境】https://baseline.wshoco.cn/</p>
+<p>【验证结果】</p>
+<p>1）检查项1。</p>
+<p>2）检查项2。</p>
+<p>3）检查项3。</p>
+<p>【截图证据】</p>
+<p>实际验证通过截图1：标题1<br/>实际截图结果：结论1。<br/>查看截图1：<a href="https://www.tapd.cn/<workspace_id>/attachments/preview_attachments/<attachment_id>/bug?" target="_blank">打开图片</a></p>
+<p>实际验证通过截图2：标题2<br/>实际截图结果：结论2。<br/>查看截图2：<a href="https://www.tapd.cn/<workspace_id>/attachments/preview_attachments/<attachment_id>/bug?" target="_blank">打开图片</a></p>
+<p>实际验证通过截图3：标题3<br/>实际截图结果：结论3。<br/>查看截图3：<a href="https://www.tapd.cn/<workspace_id>/attachments/preview_attachments/<attachment_id>/bug?" target="_blank">打开图片</a></p>
+<p>【备注】仅在需要补充限制项或重跑修正点时填写。</p>
+```
+
+执行注意：
+- 上传顺序要和评论中的截图顺序保持一致。
+- 导出按钮若置灰或不可点，评论必须写页面实际状态，不能写成“导出成功”。
+- API 评论成功后，默认不再重复登录网页写同样的评论。
+- 字段顺序固定，不再使用“回归信息/回归页面”等其他变体标题。
 
 #### 2.5 自动化测试覆盖（如已配置）
 
