@@ -1,0 +1,27 @@
+# Python 虚拟环境
+.venv/
+venv/
+env/
+
+# Python 编译产物
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# 环境变量 / 敏感配置
+.env
+.env.*
+*.secret
+
+# 证据截图（本地留存，不上传）
+evidence/
+
+# 操作系统产物
+.DS_Store
+Thumbs.db
+
+# IDE / 编辑器
+.vscode/
+*.swp
+*.swo
