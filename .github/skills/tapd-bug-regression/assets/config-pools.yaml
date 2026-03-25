@@ -1,0 +1,248 @@
+# TAPD 问题池配置
+
+本文档定义三个主要问题池（交付池、产研池、售后池）的访问规则、回归策略、环境配置。
+
+## 问题池纲览
+
+| 池名 | workspace_id | 点用途 | 主要角色 |
+|---|---|---|---|
+| 企微需求_交付池 | 65152329 | 交付团队的缺陷管理、客户级 bug 跟踪、SLA 管理 | PM、QA、工程师 |
+| 企微需求_产研池 | 44949107 | 产品和研发的 bug、技术债、架构优化 | PM、开发、测试 |
+| 企微需求_售后池 | 41700174 | 客服反馈、售后维保、现场问题 | 售后、支持、工程师 |
+
+## 交付池配置 (workspace_id: 65152329)
+
+### API 访问
+
+```bash
+TAPD_WORKSPACE_ID=65152329
+TAPD_API_USER="your_user"
+TAPD_API_PASSWORD="your_password"
+TAPD_API_TOKEN="your_token"
+```
+
+### 常用命令
+
+```bash
+# 查询 bug
+python3 "$TAPD_SCRIPT" bug-get --workspace-id 65152329 --id <bug_id>
+
+# 列举 bug
+python3 "$TAPD_SCRIPT" bug-list --workspace-id 65152329 --limit 20
+
+# 创建 bug
+python3 "$TAPD_SCRIPT" bug-create --workspace-id 65152329 --title "bug title" --description "..."
+
+# 更新 bug 状态
+python3 "$TAPD_SCRIPT" bug-update --workspace-id 65152329 --id <bug_id> --status <status>
+```
+
+### 缺陷状态流转
+
+交付池常见的缺陷状态及流转规则：
+
+| 状态 | 含义 | 下一步 | 备注 |
+|---|---|---|---|
+| 新建 | 缺陷刚报告 | 分配给相关人员 | QA 报告 |
+| 分配中 | 待分配给具体工程师 | 处理中 / 驳回 | PM 或 Team Lead 分配 |
+| 处理中 | 工程师正在修复 | 待验证 | 修复一般在测试分支进行 |
+| 待验证 | 等待 QA 回归验证 | 已验证 / 重新打开 | QA 回归 |
+| 已验证 | QA 确认问题已修复 | 关闭 | 问题在当前版本解决 |
+| 已关闭 | bug 结束 | - | 生命周期终结 |
+| 推迟 / 驳回 | bug 暂不处理或非缺陷 | - | 可重新打开 |
+
+### 优先级与处理 SLA
+
+| 优先级 | 含义 | 预期处理时间 | 回归深度 |
+|---|---|---|---|
+| P1 | 严重 bug，影响核心功能或数据安全 | 立即处理 | 深度回归：相邻流程、自动化测试、性能测试 |
+| P2 | 重要 bug，影响主要功能或用户体验 | 24h 内处理 | 中度回归：相邻流程、基本功能覆盖 |
+| P3 | 普通 bug，仅影响边界场景或非关键功能 | 一周内处理 | 基础回归：精确复现、直接相邻流程 |
+| P4 | 轻微 bug，建议优化或体验提升 | 长期处理 | 基本回归：确认修复即可 |
+
+### 客户级别影响评估
+
+| 客户级别 | 示例 | 影响范围 | 建议处理优先级 |
+|---|---|---|---|
+| VIP / 战略 | 大型企业客户 | 整个客户用户群体 | 优先处理 |
+| 重点 / 战术 | 中等规模客户 | 客户特定功能 | 正常处理 |
+| 普通 | 常规客户 | 该功能的所有用户 | 常规处理 |
+| 内部 | 内部员工 | 内部测试 | 可延期处理 |
+
+### 环境配置示例
+
+```yaml
+交付池:
+  workspace_id: 65152329
+  app_type: web
+  base_url: "https://delivery-app.example.com"
+  start_commands:
+    - npm install
+    - npm run build
+    - npm run dev:delivery
+  test_environments:
+    - name: 测试环境
+      url: "https://test.delivery.example.com"
+      db_config: "test_db"
+    - name: 预发布环境
+      url: "https://pre.delivery.example.com"
+      db_config: "pre_db"
+  test_accounts:
+    - role: admin
+      username: admin_delivery
+      password: [from_secure_vault]
+    - role: 项目经理
+      username: pm_delivery
+      password: [from_secure_vault]
+    - role: 工程师
+      username: eng_delivery
+      password: [from_secure_vault]
+    - role: 客户
+      username: customer_delivery
+      password: [from_secure_vault]
+```
+
+## 产研池配置 (workspace_id: 44949107)
+
+### API 访问
+
+```bash
+TAPD_WORKSPACE_ID=44949107
+```
+
+### 常用命令
+
+```bash
+# 查询产研池中的 bug
+python3 "$TAPD_SCRIPT" bug-get --workspace-id 44949107 --id <bug_id>
+
+# 列举产研池的需求
+python3 "$TAPD_SCRIPT" story-list --workspace-id 44949107 --limit 20
+
+# 创建产研 bug
+python3 "$TAPD_SCRIPT" bug-create --workspace-id 44949107 --title "bug title" --description "..."
+```
+
+### 缺陷状态流转
+
+产研池的缺陷状态通常包括：
+
+| 状态 | 含义 |
+|---|---|
+| 新建 | 新报告的 bug |
+| 已分配 | 已指派给产研团队 |
+| 开发中 | 正在修复 |
+| 待测试 | 等待测试验证 |
+| 测试通过 | 测试已验证 |
+| 已完结 | bug 处理完结 |
+| 不是缺陷 | 报告者误认 |
+
+### 常见需求类别
+
+| 类别 | ID | 用途 |
+|---|---|---|
+| STORY 产品需求 | 1000051 | 产品功能需求 |
+| SMART 产品需求 | 1000081 | 智能需求 |
+| SMALL 产品需求 | 1000155 | 小范围需求 |
+| 研发自建 | 1000151 | 技术债、架构优化 |
+| 基线合入需求 | 1000193 | 分支合并 |
+
+## 售后池配置 (workspace_id: 41700174)
+
+### API 访问
+
+```bash
+TAPD_WORKSPACE_ID=41700174
+```
+
+### 常用命令
+
+```bash
+# 查询售后池中的 bug
+python3 "$TAPD_SCRIPT" bug-get --workspace-id 41700174 --id <bug_id>
+
+# 售后缺陷列表
+python3 "$TAPD_SCRIPT" bug-list --workspace-id 41700174 --limit 20
+```
+
+### 缺陷状态流转
+
+售后池通常重点关注客户反馈、现场问题：
+
+| 状态 | 含义 | 处理人 |
+|---|---|---|
+| 新建 | 客户反馈或现场发现 | 售后 |
+| 确认中 | 售后确认是否重现 | 售后 |
+| 已确认 | 确认为真实缺陷 | 售后 → 工程师 |
+| 修复中 | 工程师修复处理 | 工程师 |
+| 待客户验证 | 修复后待客户验证 | 客户 / 售后 |
+| 已解决 | 客户确认解决 | 售后 |
+| 已关闭 | 案例关闭 | 售后 |
+
+### 客户级别与 SLA
+
+| 客户等级 | VIP / 战略 | 重点 | 普通 |
+|---|---|---|---|
+| **回应时间** | 1h | 4h | 8h |
+| **修复目标** | 24-48h | 3-5 天 | 1-2 周 |
+| **回归深度** | 深度（包括现场验证） | 中度 | 基础 |
+
+## 跨池查询与回归流程
+
+### 场景 1：同编号 bug 在多个池中重复
+
+某个 bug 可能在多个池中存在（如交付池报告、产研池确认、售后池反馈）。
+
+**推荐流程**：
+1. 优先在原始池中回归（以对应 workspace_id 为准）
+2. 若需验证其他池中的同编号 bug，使用 `--workspace` 参数切换
+
+```bash
+# 在交付池验证
+/tapd-bug-regression 1119626 --workspace 交付池
+
+# 在产研池验证
+/tapd-bug-regression 1119626 --workspace 产研池
+
+# 在售后池验证  
+/tapd-bug-regression 1119626 --workspace 售后池
+```
+
+### 场景 2：跨池级联验证
+
+如果一个修复涉及多个池：
+
+1. 第一步：在产研池验证修复（技术问题源头）
+2. 第二步：在交付池验证修复（交付团队 SLA）
+3. 第三步：在售后池验证修复（客户影响范围）
+
+每个回归都应生成独立的报告。
+
+### 场景 3：环境依赖与版本管理
+
+| 池 | 关键环境 | 版本依赖 | 测试账号要求 |
+|---|---|---|---|
+| 交付池 | 测试/预发/生产 | 需要对应版本 | 客户/PM/工程师 |
+| 产研池 | 开发/测试 | 分支版本 | 内部工程师 |
+| 售后池 | 客户环境/现场 | 客户指定版本 | 现场/销售账号 |
+
+## 通用回归规范
+
+### 跨池基础检查清单
+
+每个 pool 的回归都需要确认以下项：
+
+- [ ] Bug 信息完整（标题、描述、优先级、版本）
+- [ ] 环境可达性（能否访问测试环境）
+- [ ] 测试账号有效（权限满足需求）
+- [ ] 测试数据就绪（必要的初始数据已准备）
+- [ ] 代码/部署验证（修复已在当前版本部署）
+
+### 回归报告格式统一
+
+所有回归报告使用 [regression-report.template.md](./regression-report.template.md) 的格式，确保版本、环境、结论清晰。
+
+---
+
+**文档版本**：v2.0  
+**最后更新**：2026-03-23
