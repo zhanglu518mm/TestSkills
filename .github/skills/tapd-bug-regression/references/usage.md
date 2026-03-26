@@ -264,8 +264,12 @@ npm run dev:delivery
 <p>1）问答知识页导出按钮状态已核对。</p>
 <p>2）文件知识页问答.txt 可见。</p>
 <p>3）文件预览页无 00401 报错。</p>
+
 <p>【截图证据】</p>
-<p>实际验证通过截图1：问答知识页（导出列表按钮状态）<br/>实际截图结果：0 条数据，按钮置灰。<br/>查看截图1：<a href="https://www.tapd.cn/65152329/attachments/preview_attachments/1165152329001015133/bug?" target="_blank">打开图片</a></p>
+
+<p>实际验证通过截图1：问答知识页（导出列表按钮状态）</p>
+<p>实际截图结果：0 条数据，按钮置灰。</p>
+<p>查看截图1：<a href="https://www.tapd.cn/65152329/attachments/preview_attachments/1165152329001015133/bug?" target="_blank">打开图片</a></p>
 ```
 
 #### 2.8 固定回写策略（推荐直接照做）
@@ -312,18 +316,103 @@ https://www.tapd.cn/65152329/attachments/preview_attachments/1165152329001015133
 <p>1）检查项1。</p>
 <p>2）检查项2。</p>
 <p>3）检查项3。</p>
+
 <p>【截图证据】</p>
-<p>实际验证通过截图1：标题1<br/>实际截图结果：结论1。<br/>查看截图1：<a href="https://www.tapd.cn/<workspace_id>/attachments/preview_attachments/<attachment_id>/bug?" target="_blank">打开图片</a></p>
-<p>实际验证通过截图2：标题2<br/>实际截图结果：结论2。<br/>查看截图2：<a href="https://www.tapd.cn/<workspace_id>/attachments/preview_attachments/<attachment_id>/bug?" target="_blank">打开图片</a></p>
-<p>实际验证通过截图3：标题3<br/>实际截图结果：结论3。<br/>查看截图3：<a href="https://www.tapd.cn/<workspace_id>/attachments/preview_attachments/<attachment_id>/bug?" target="_blank">打开图片</a></p>
+
+<p>实际验证通过截图1：标题1</p>
+<p>实际截图结果：结论1。</p>
+<p>查看截图1：<a href="https://www.tapd.cn/<workspace_id>/attachments/preview_attachments/<attachment_id>/bug?" target="_blank">打开图片</a></p>
+
+<p>实际验证通过截图2：标题2</p>
+<p>实际截图结果：结论2。</p>
+<p>查看截图2：<a href="https://www.tapd.cn/<workspace_id>/attachments/preview_attachments/<attachment_id>/bug?" target="_blank">打开图片</a></p>
+
+<p>实际验证通过截图3：标题3</p>
+<p>实际截图结果：结论3。</p>
+<p>查看截图3：<a href="https://www.tapd.cn/<workspace_id>/attachments/preview_attachments/<attachment_id>/bug?" target="_blank">打开图片</a></p>
+
 <p>【备注】仅在需要补充限制项或重跑修正点时填写。</p>
 ```
+
+HTML 排版硬规则：
+1. 每个截图块必须拆成三段 `<p>`（标题、结果、链接）。
+2. 不再使用“一个 `<p>` 内多行 `<br/>`”的写法。
+3. 截图块之间必须有空行，确保 TAPD 评论区可读性。
 
 执行注意：
 - 上传顺序要和评论中的截图顺序保持一致。
 - 导出按钮若置灰或不可点，评论必须写页面实际状态，不能写成“导出成功”。
 - API 评论成功后，默认不再重复登录网页写同样的评论。
 - 字段顺序固定，不再使用“回归信息/回归页面”等其他变体标题。
+
+### 附件上传权限优化（团队协作）
+
+建议采用“token 优先 + 服务账号兜底”的双通道：
+
+1. 先用个人 `TAPD_API_TOKEN` 上传附件。
+2. 若返回 403（`attachments::_save_new` / `attachments::upload`），再切换服务账号 `TAPD_API_USER` + `TAPD_API_PASSWORD` 上传。
+3. 服务账号仅用于上传附件，不用于状态流转或业务查询。
+4. 若服务账号返回 `This api not writeable.` 或 WAF 403，说明当前账号/接口组合仍不可直传，后续统一回退到“网页附件上传 + API 评论回写”。
+
+安全要求：
+- 不在仓库提交任何账号密码或 token。
+- 不在控制台、脚本日志、评论正文中打印凭证明文。
+- 团队成员通过企业密码库获取同一上传账号，按本地环境变量注入。
+- 本地凭证文件必须加入 gitignore（例如 `local.env.ps1`），并限制访问权限仅当前用户可读。
+
+当前验证结果：
+- 已验证 `POST /attachments`：返回 403，提示 `This api not writeable.`
+- 已验证 `POST /attachments/upload`：返回 WAF 403
+- 结论：当前服务账号暂不可直接用于 TAPD OpenAPI 附件上传
+
+可落地替代方案（已验证）：
+1. TAPD 网页附件真实上传接口：`POST /api/entity/attachments/add_attachment_drag?needRepeatInterceptors=false`。
+2. 上传后排序接口：`POST /api/entity/attachments/update_attachment_sort`（请求体含 `dsc_token`）。
+3. 附件查询接口：`GET /api/entity/attachments/attachment_list`。
+4. 以上接口要求 TAPD 网页登录态，建议通过 Playwright 复用登录会话执行“附件上传”，再继续用 TAPD API 回写评论与状态。
+
+网页会话上传桥接脚本（可复用）：
+
+```powershell
+# 首次使用（只需一次）
+pip install playwright
+playwright install
+
+# 执行附件上传桥接（可重复 --file）
+python .github/skills/tapd-bug-regression/scripts/tapd-web-attachment-bridge.py `
+   --workspace-id 44949107 `
+   --entity-id 1144949107001116913 `
+   --entity-type bug `
+   --storage-state .github/skills/tapd-bug-regression/tapd.storage-state.json `
+   --file D:/Projects/TestSkills/evidence/1116913/20260325-rerun-01-points-statistics-page.png `
+   --file D:/Projects/TestSkills/evidence/1116913/20260325-rerun-05-export-wait-result.png
+```
+
+脚本输出为 JSON，包含每张图的 `attachment_id` 和 `preview_url`，可直接拼接到 API 评论 HTML 正文中。
+
+一键发布脚本（上传 + 生成 HTML + API 评论）：
+
+```powershell
+python .github/skills/tapd-bug-regression/scripts/tapd-regression-publish.py `
+   --workspace-id 44949107 `
+   --entity-id 1144949107001116913 `
+   --entity-type bug `
+   --env-url https://wsai.wshoco.cn/scrm/login `
+   --storage-state .github/skills/tapd-bug-regression/tapd.storage-state.json `
+   --check "进入积分统计页并执行导出，状态从导出中到导出完成。" `
+   --check "点击下载入口后页面无 00401/no authority 报错。" `
+   --check "导出链路与页面状态正常，满足本次回归验证要求。" `
+   --file D:/Projects/TestSkills/evidence/1116913/20260325-rerun-01-points-statistics-page.png `
+   --image-title "积分统计页（导出前）" `
+   --file D:/Projects/TestSkills/evidence/1116913/20260325-rerun-05-export-wait-result.png `
+   --image-title "导出状态页（导出进行中/完成）" `
+   --remark "本次评论由自动化脚本生成，HTML 已按分段规则换行。"
+```
+
+说明：
+- 先执行网页会话附件上传，再调用 TAPD API 发评论。
+- `--dry-run` 可只看生成的 HTML，不真正发评论。
+- 若需留存正文，可加 `--save-html <path>`。
 
 #### 2.5 自动化测试覆盖（如已配置）
 

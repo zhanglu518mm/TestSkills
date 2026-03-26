@@ -233,6 +233,20 @@ API 评论附加规则：
 - 上传完成后必须核对附件名称、`attachment_id`、预览链接三者一一对应。
 - 若上传了错误截图，不得继续复用原链接，必须重新上传并替换评论中的错误链接。
 
+附件上传认证策略（强制）：
+1. 默认使用当前会话 `TAPD_API_TOKEN` 上传附件。
+2. 若返回 403 且信息包含 `attachments::_save_new` 或 `attachments::upload` 权限不足，则自动切换到服务账号 BasicAuth 进行附件上传。
+3. 服务账号只用于“附件上传”动作，Bug/评论查询与状态流转仍优先使用个人 token。
+4. 服务账号凭证禁止写入仓库、禁止出现在日志和评论，必须仅保存在本地环境变量或企业密钥管理系统中。
+5. 若服务账号测试返回 `This api not writeable.`、WAF 403 或其他接口侧阻断，则判定“当前服务账号不可用于 OpenAPI 附件直传”，立即回退为“网页附件上传 + API 评论回写”。
+
+网页上传回退链路（已验证）：
+1. 在 TAPD bug 详情页登录态下，附件上传走站内接口 `POST /api/entity/attachments/add_attachment_drag?needRepeatInterceptors=false`（multipart/form-data）。
+2. 上传成功后会调用 `POST /api/entity/attachments/update_attachment_sort`，并带 `dsc_token`、`workspace_id`、`entity_id`、`entity_type`、`sort`。
+3. 最后通过 `GET /api/entity/attachments/attachment_list` 拉取附件列表并得到 `attachment_id`。
+4. 该链路依赖 TAPD 网页登录会话（Cookie/站内鉴权），不等价于 `https://api.tapd.cn/attachments` 与 `https://api.tapd.cn/attachments/upload`。
+5. 团队自动化建议：使用 Playwright 登录 TAPD 后调用上述站内接口上传附件，再继续走 API 评论回写。
+
 API 评论固定结构：
 - 第一段：`【回归结论】验证通过。`
 - 第二段：`【回归时间】`、`【回归环境】`
@@ -292,12 +306,28 @@ API 评论固定结构：
 <p>1）检查项1结果。</p>
 <p>2）检查项2结果。</p>
 <p>3）检查项3结果。</p>
+
 <p>【截图证据】</p>
-<p>实际验证通过截图1：问答知识页（导出列表按钮状态）<br/>实际截图结果：当前页 0 条数据，导出按钮置灰。<br/><a href="https://www.tapd.cn/65152329/attachments/preview_attachments/1165152329001015133/bug?" target="_blank">查看截图1</a></p>
-<p>实际验证通过截图2：文件知识页（含问答.txt条目）<br/>实际截图结果：列表展示正常。<br/><a href="https://www.tapd.cn/65152329/attachments/preview_attachments/1165152329001015134/bug?" target="_blank">查看截图2</a></p>
-<p>实际验证通过截图3：问答.txt预览页<br/>实际截图结果：文件预览页可正常打开，未出现权限报错。<br/><a href="https://www.tapd.cn/65152329/attachments/preview_attachments/1165152329001015135/bug?" target="_blank">查看截图3</a></p>
+
+<p>实际验证通过截图1：问答知识页（导出列表按钮状态）</p>
+<p>实际截图结果：当前页 0 条数据，导出按钮置灰。</p>
+<p><a href="https://www.tapd.cn/65152329/attachments/preview_attachments/1165152329001015133/bug?" target="_blank">查看截图1</a></p>
+
+<p>实际验证通过截图2：文件知识页（含问答.txt条目）</p>
+<p>实际截图结果：列表展示正常。</p>
+<p><a href="https://www.tapd.cn/65152329/attachments/preview_attachments/1165152329001015134/bug?" target="_blank">查看截图2</a></p>
+
+<p>实际验证通过截图3：问答.txt预览页</p>
+<p>实际截图结果：文件预览页可正常打开，未出现权限报错。</p>
+<p><a href="https://www.tapd.cn/65152329/attachments/preview_attachments/1165152329001015135/bug?" target="_blank">查看截图3</a></p>
+
 <p>【备注】已按本次回归结果更新评论模板与证据链接。</p>
 ```
+
+HTML 排版要求（强制）：
+1. 每个截图块必须拆成独立三段 `<p>`：标题段、结果段、链接段。
+2. 截图块之间必须保留空行，不允许用一个 `<p>` + 多个 `<br/>` 挤在一起。
+3. `【验证结果】` 与 `【截图证据】` 标题段前后都要保留空行。
 
 ## 跨池快速切换
 

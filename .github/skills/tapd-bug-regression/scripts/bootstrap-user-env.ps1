@@ -57,12 +57,17 @@ $user = Get-EnvValue -Prompt '请输入 TAPD_API_USER' -CurrentValue $env:TAPD_A
 $password = Get-EnvValue -Prompt '请输入 TAPD_API_PASSWORD' -CurrentValue $env:TAPD_API_PASSWORD -Secret
 $baseUrl = Get-EnvValue -Prompt '请输入 TAPD_API_BASE_URL（回车使用默认 https://api.tapd.cn）' -CurrentValue $env:TAPD_API_BASE_URL
 $companyId = Get-EnvValue -Prompt '请输入 TAPD_COMPANY_ID（回车使用默认 66514098）' -CurrentValue $env:TAPD_COMPANY_ID
+$webBaseUrl = Get-EnvValue -Prompt '请输入 TAPD_WEB_BASE_URL（回车使用默认 https://www.tapd.cn）' -CurrentValue $env:TAPD_WEB_BASE_URL
+$webStorageState = Get-EnvValue -Prompt '请输入 TAPD_WEB_STORAGE_STATE（可留空，例如 .github/skills/tapd-bug-regression/tapd.storage-state.json）' -CurrentValue $env:TAPD_WEB_STORAGE_STATE
 
 if ([string]::IsNullOrWhiteSpace($baseUrl)) {
     $baseUrl = 'https://api.tapd.cn'
 }
 if ([string]::IsNullOrWhiteSpace($companyId)) {
     $companyId = '66514098'
+}
+if ([string]::IsNullOrWhiteSpace($webBaseUrl)) {
+    $webBaseUrl = 'https://www.tapd.cn'
 }
 
 $localEnvContent = @(
@@ -72,7 +77,9 @@ $localEnvContent = @(
     "$env:TAPD_API_USER = '$(Escape-SingleQuote $user)'",
     "$env:TAPD_API_PASSWORD = '$(Escape-SingleQuote $password)'",
     "$env:TAPD_API_BASE_URL = '$(Escape-SingleQuote $baseUrl)'",
-    "$env:TAPD_COMPANY_ID = '$(Escape-SingleQuote $companyId)'"
+    "$env:TAPD_COMPANY_ID = '$(Escape-SingleQuote $companyId)'",
+    "$env:TAPD_WEB_BASE_URL = '$(Escape-SingleQuote $webBaseUrl)'",
+    "$env:TAPD_WEB_STORAGE_STATE = '$(Escape-SingleQuote $webStorageState)'"
 )
 
 Set-Content -Path $localEnv -Value $localEnvContent -Encoding UTF8
@@ -83,6 +90,8 @@ $env:TAPD_API_USER = $user
 $env:TAPD_API_PASSWORD = $password
 $env:TAPD_API_BASE_URL = $baseUrl
 $env:TAPD_COMPANY_ID = $companyId
+$env:TAPD_WEB_BASE_URL = $webBaseUrl
+$env:TAPD_WEB_STORAGE_STATE = $webStorageState
 
 if (-not $SkipProfileUpdate) {
     if (-not (Test-Path $PROFILE)) {

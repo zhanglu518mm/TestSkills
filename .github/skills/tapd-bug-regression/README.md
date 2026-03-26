@@ -146,9 +146,15 @@ powershell -ExecutionPolicy Bypass -File .github/skills/tapd-bug-regression/scri
 | 更新 bug 状态 | `bug-update` | 验证完后可选 |
 
 评论回写默认策略（强制）：
-- 先走 TAPD 网页评论编辑器，复制粘贴图片到评论区。
-- 粘贴失败时使用附件上传并在评论中引用。
-- API 评论仅用于无图兜底，不可替代网页贴图。
+- 优先使用 TAPD API 写结构化 HTML 评论正文。
+- 附件优先走“网页会话附件上传桥接”后，再把预览链接写入 API 评论正文。
+- 网页评论编辑器仅作为 API 回写失败时的第二优先级兜底。
+
+一键发布命令（推荐）：
+
+```powershell
+python .github/skills/tapd-bug-regression/scripts/tapd-regression-publish.py --workspace-id <ws_id> --entity-id <entity_id> --env-url <env_url> --check "<结果1>" --check "<结果2>" --check "<结果3>" --file <截图1> --image-title "<标题1>" --file <截图2> --image-title "<标题2>"
+```
 
 更多细节见 [references/usage.md](./references/usage.md#与-tapd-skill-的集成)
 
