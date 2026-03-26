@@ -215,6 +215,18 @@ python3 "$TAPD_SCRIPT" account-info
 - 若接口返回失败或字段为空，则使用环境变量 `TAPD_API_USER` 的值作为回归人标识。
 - 回归人信息必须写入评论，禁止省略。
 
+**第二步：写评论前查重（强制）**
+
+在调用 `comment-add` 之前，必须先检查是否已存在当前账号提交的回归评论：
+
+```bash
+python3 "$TAPD_SCRIPT" comment-list --workspace-id <workspace_id> --entry-type bug --entry-id <bug_id>
+```
+
+- 若列表中已存在由当前回归人提交且包含"回归结论"或"验证通过"的评论，**跳过 `comment-add`**，改用 `comment-update` 补充差异内容（如截图链接）。
+- 若列表为空或无相关评论，正常执行 `comment-add`。
+- 禁止在同一 bug 下重复写入相同结论的评论，避免因命令重试或静默重复执行导致多条重复评论。
+
 通过后状态规则：
 - 交付池（65152329）：状态更新为 `已关闭`
 - 售后池（41700174）：状态更新为 `线上验证`
