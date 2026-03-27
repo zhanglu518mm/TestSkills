@@ -138,12 +138,12 @@ python3 "$TAPD_SCRIPT" bug-get --workspace-id <ws_id> --id <bug_id>
 > Agent 根据用户是否提供 token **自动选择**登录方式，无需人工指定。
 
 - **用户已提供 token → Token 注入（优先）**：
-  打开 `/login` 页，通过 Playwright `Run Playwright code` 在 **sessionStorage** 中注入以下字段，然后跳转到 `/index/dashboard`；出现"首页"文案即为登录成功，否则判定 token 无效，自动降级到扫码登录。
-  - `current-token`：用户提供的 token 值（**注意：key 是 `current-token`，不是 `token`**）
-  - `hasLogin`：固定值 `"1"`
-  - `WS_BASE_INFO_SESSION_STORAGE_KEY`：包含 userInfo JSON 的用户信息串（可先导航到系统后从 sessionStorage 读取，或由用户粘贴）
-  - `module_version`：`"master"` 或 `"gray"`（按环境填写）
-  - `AUTOMATION_SWITCH`：固定值 `"1"`
+  打开 `/login` 页，通过 Playwright 按以下方式注入，然后跳转到 `/index/dashboard`；出现"首页"文案即为登录成功，否则判定 token 无效，自动降级到扫码登录。
+  - **Cookie**：key = `token`，value = 用户提供的 token 值，domain = 当前回归域名，path = `/`
+  - **sessionStorage**：
+    - `module_version`：`"master"` 或 `"gray"`（按环境填写）
+    - `AUTOMATION_SWITCH`：固定值 `"1"`
+  - **注意**：key 是 Cookie 中的 `token`，sessionStorage 里只需设 `module_version` 和 `AUTOMATION_SWITCH`，不需要注入 `current-token`、`hasLogin`、`WS_BASE_INFO_SESSION_STORAGE_KEY` 等其他字段。
 
 - **用户未提供 token → 扫码登录（自动降级）**：
   用命令行打开**系统默认可见浏览器**（`start chrome <url>` 或 `webbrowser.open()`），导航到回归系统登录页，在对话中提示用户"请在刚打开的浏览器窗口中扫码登录，完成后回复我"，等待用户确认后继续执行后续步骤。
