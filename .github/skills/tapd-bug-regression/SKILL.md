@@ -196,7 +196,11 @@ python3 "$TAPD_SCRIPT" bug-get --workspace-id <ws_id> --id <bug_id>
 
 ### 5. 执行回归检查
 
-> **参考规范**：执行 PC 端（管理端）操作时，遵守 `D:\Projects\claudecodeprompts\.agents\skills\qa-testcase-execute\reference\admin-execution.md` 中的全部执行规则，以下为关键摘要。
+> **参考规范（按端选择，强制）**：
+> - **PC 端 / 管理端**：遵守 [reference/admin-execution.md](reference/admin-execution.md) 中的全部执行规则，以下为关键摘要。
+> - **移动端**：遵守 [reference/mobile-execution.md](reference/mobile-execution.md) 中的全部执行规则。
+> - **手机操作（企微客户端）**：通过 [reference/phone-agent.md](reference/phone-agent.md) 中定义的手机操作智能体执行。
+> - **企业微信 UI 自动化**：参照 [reference/wework-ui-automation.md](reference/wework-ui-automation.md) 的规范。
 
 **步骤流程**：
 
@@ -493,3 +497,4 @@ Agent 会自动将关键词映射到对应的 `workspace_id`，通过 `bug-get` 
 - 问题池配置与说明：[assets/config-pools.yaml](./assets/config-pools.yaml)
 - 详细工作流说明：[references/usage.md](./references/usage.md)
 - 回归报告模板：[assets/regression-report.template.md](./assets/regression-report.template.md)
+
