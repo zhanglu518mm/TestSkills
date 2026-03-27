@@ -123,6 +123,44 @@ python3 "$TAPD_SCRIPT" bug-get --workspace-id <ws_id> --id <bug_id>
 - 菜单文档中未收录的路径，才可根据 bug 描述或 PRD 自行推断。
 - 导航路径确认后，按该路径依次点击菜单进入目标页面，不得跳过中间菜单层级。
 
+**左侧树形菜单导航技巧（运营分析 / 基础看板等自定义树组件）**：
+- 企微管理后台的运营分析侧边栏是**自定义树组件**，不使用 `el-menu-item` / `el-sub-menu__title` 类，而是 `div.node-box`。
+- `li:has-text()` 会命中祖先节点导致点击无效，`text=xxx` locator 的隐藏元素也会超时。
+- 正确方式：用 JavaScript `TreeWalker` 精确匹配**纯文字节点**，向上找第一个非 `SPAN` 的可见父元素并 `click()`：
+  ```python
+  def js_click_by_text(page, text):
+      return page.evaluate("""
+          (text) => {
+              const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+              let node;
+              while (node = walker.nextNode()) {
+                  if (node.textContent.trim() === text) {
+                      let el = node.parentElement;
+                      while (el && el.tagName === 'SPAN') el = el.parentElement;
+                      if (el && el.offsetParent !== null) {
+                          el.click();
+                          return 'clicked: ' + el.tagName + ' ' + el.className;
+                      }
+                  }
+              }
+              return 'not found: ' + text;
+          }
+      """, text)
+  # 用法：点击「运营分析」后侧边栏自动展开，无需再点「基础看板」，直接点二级即可
+  page.locator('text=运营分析').first.click(); page.wait_for_timeout(1500)
+  js_click_by_text(page, '员工分析'); page.wait_for_timeout(1500)
+  js_click_by_text(page, '员工统计'); page.wait_for_timeout(3000)
+  ```
+
+**弹窗内操作注意（Element Plus el-overlay-dialog 遮罩）**：
+- Element Plus 对话框会在页面顶层渲染 `.el-overlay-dialog` 遮罩，普通 `click()` 可能报 "subtree intercepts pointer events"。
+- 解决方案：将 locator 限定在 `page.locator('[role="dialog"]')` 内部，并加 `force=True`：
+  ```python
+  dialog = page.locator('[role="dialog"]')
+  dialog.locator('.el-radio:not(.is-checked)').first.click(force=True)
+  dialog.locator('button:has-text("取 消"), button:has-text("取消")').first.click(force=True)
+  ```
+
 浏览器执行策略（优先级从高到低）：
 1. **Playwright 工具**（首选）：打开页面、读取页面、点击操作、截图留证，全自动执行。
 2. **系统默认浏览器**（Playwright 工具不可用时）：通过终端命令自动在默认浏览器中打开回归环境地址，由你在浏览器中操作；Copilot 提供逐步检查指引，并在每一步完成后请你口头确认或截图提供结果。
@@ -288,6 +326,11 @@ API 评论附加规则：
 - 命名规范：`YYYYMMDD-rerun-01-<meaning>.png`、`YYYYMMDD-rerun-02-<meaning>.png`。
 - 上传完成后必须核对附件名称、`attachment_id`、预览链接三者一一对应。
 - 若上传了错误截图，不得继续复用原链接，必须重新上传并替换评论中的错误链接。
+
+**附件上传工具选择顺序（强制）**：
+1. 首选：直接调用 `tapd-web-attachment-bridge.py`（使用站内 API `/api/entity/attachments/add_attachment_drag`，比 UI 按钮方式更可靠）。
+2. Bearer token 直传（`https://api.tapd.cn/attachments`）返回 403 `attachments::_save_new` 时，跳过，直接走步骤 1，不要重试。
+3. 若 bridge 脚本也失败，创建独立上传脚本（`upload_attachments.py` 模式），使用 `page.request.fetch()` 调用同一站内 API。
 
 附件上传认证策略（强制）：
 1. 默认使用当前会话 `TAPD_API_TOKEN` 上传附件。

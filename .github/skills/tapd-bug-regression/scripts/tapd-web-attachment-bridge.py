@@ -66,37 +66,63 @@ def _expand_attachment_panel(page) -> None:
 
 
 def _wait_for_login(page, tapd_web_base: str) -> None:
-    if "cloud_logins/login" not in page.url:
+    """Wait for TAPD login without blocking on stdin (works in VS Code terminals)."""
+    def _is_login_page(url: str) -> bool:
+        return "cloud_logins/login" in url or "/login" in url
+
+    if not _is_login_page(page.url):
         return
+
     print(
-        "Please complete TAPD login in the opened browser, then press Enter...",
+        "[TAPD] 登录页已弹出——请在浏览器中扫码登录（企业微信扫码），最多等待 120 秒…",
         file=sys.stderr,
     )
-    input()
+    try:
+        page.wait_for_url(
+            lambda url: not _is_login_page(url),
+            timeout=120_000,
+        )
+    except Exception:
+        pass  # timeout: proceed anyway, next goto will reveal if still logged out
     page.wait_for_timeout(800)
-    if "cloud_logins/login" in page.url:
-        page.goto(tapd_web_base.rstrip("/") + "/my_dashboard", wait_until="domcontentloaded")
 
 
-def _upload_one(page, file_path: Path) -> Dict[str, str]:
-    _expand_attachment_panel(page)
+def _upload_one(page, file_path: Path, workspace_id: str, entity_id: str, entity_type: str) -> Dict[str, str]:
+    """Upload via TAPD internal API (more reliable than UI button)."""
+    import mimetypes
+    mime = mimetypes.guess_type(str(file_path))[0] or "image/png"
+    file_bytes = file_path.read_bytes()
 
-    btn = page.get_by_role("button", name=re.compile(r"添加本地文件"))
-    btn.first.wait_for(timeout=15000)
+    resp = page.request.fetch(
+        "https://www.tapd.cn/api/entity/attachments/add_attachment_drag?needRepeatInterceptors=false",
+        method="POST",
+        multipart={
+            "workspace_id": workspace_id,
+            "entity_id": entity_id,
+            "entity_type": entity_type,
+            "file": {"name": file_path.name, "mimeType": mime, "buffer": file_bytes},
+        },
+    )
+    data = resp.json()
+    print(f"  上传 {file_path.name} → HTTP {resp.status}", file=sys.stderr)
 
-    with page.expect_file_chooser(timeout=15000) as fc:
-        btn.first.click()
-    chooser = fc.value
-    chooser.set_files(str(file_path))
-
-    name_locator = page.locator("a", has_text=file_path.name)
-    name_locator.first.wait_for(timeout=20000)
-    href = name_locator.first.get_attribute("href") or ""
-    full_href = href if href.startswith("http") else "https://www.tapd.cn" + href
+    # Fetch updated attachment list to get attachment_id
+    list_resp = page.request.fetch(
+        "https://www.tapd.cn/api/entity/attachments/attachment_list",
+        method="GET",
+        params={"workspace_id": workspace_id, "entity_id": entity_id, "entity_type": entity_type},
+    )
+    attachments = list_resp.json().get("data", {}).get("attachments", [])
+    matched = next((a for a in attachments if a.get("filename") == file_path.name), None)
+    att_id = matched["id"] if matched else ""
+    preview_url = (
+        f"https://www.tapd.cn/{workspace_id}/attachments/preview_attachments/{att_id}/{entity_type}?"
+        if att_id else ""
+    )
     return {
         "file_name": file_path.name,
-        "attachment_id": _extract_attachment_id(full_href),
-        "preview_url": full_href,
+        "attachment_id": att_id,
+        "preview_url": preview_url,
     }
 
 
@@ -140,7 +166,7 @@ def main() -> int:
         page.wait_for_timeout(1200)
 
         for f in files:
-            item = _upload_one(page, f)
+            item = _upload_one(page, f, args.workspace_id, args.entity_id, args.entity_type)
             results.append(item)
 
         if state_path:
