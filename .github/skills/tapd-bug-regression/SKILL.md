@@ -216,6 +216,13 @@ python3 "$TAPD_SCRIPT" bug-get --workspace-id <ws_id> --id <bug_id>
 执行要求：
 - 必须按问题单中的描述和测试步骤逐条验证。
 - 验证过程中保留关键步骤截图，截图应可支撑最终结论。
+- **截图规范（Playwright）**：截图前必须执行以下清洁步骤，确保画面无遮挡：
+  1. `page.setViewportSize({ width: 1920, height: 1080 })` — 设置宽屏视口；
+  2. `page.keyboard.press('Escape')` — 关闭可能打开的 Popover / DatePicker；
+  3. `page.mouse.click(x, y)` 点击空白区域（如页面标题区）— 收起下拉菜单；
+  4. `page.evaluate(() => window.scrollTo(0, 0))` — 滚动到顶部；
+  5. 确认 `.el-date-picker, .el-picker-panel, .el-date-range-picker, .ant-picker-dropdown` 等浮层均不可见后再调用 `page.screenshot()`；
+  6. **禁止** 使用 `screenshot_page` 工具截图（视口受限易被截断），一律使用 `page.screenshot({ path: ..., fullPage: false })` Playwright API 截图。
 
 **PC 端操作强制规范（来自 qa-testcase-execute）**：
 - **菜单导航优先**：只能通过菜单点击或页面内跳转到达目标页，**禁止猜测 URL 直接跳转**；菜单路径不明确时点击"查找功能"在全局菜单中定位。
